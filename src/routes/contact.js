@@ -1,0 +1,77 @@
+import express from "express";
+import { body } from "express-validator";
+import Contact from "../models/Contact.js";
+import { protect, authorize } from "../middleware/auth.js";
+import { validate } from "../middleware/validator.js";
+
+const router = express.Router();
+
+// @route   POST /api/contact
+// @desc    Submit contact form
+// @access  Public
+router.post(
+  "/",
+  [
+    body("name").trim().notEmpty().withMessage("Name is required"),
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("phone")
+      .matches(/^[0-9]{10}$/)
+      .withMessage("Valid phone is required"),
+    body("subject").trim().notEmpty().withMessage("Subject is required"),
+    body("message").trim().notEmpty().withMessage("Message is required"),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const contact = await Contact.create(req.body);
+
+      res.status(201).json({
+        success: true,
+        message: "Thank you for contacting us! We will get back to you soon.",
+        contact: {
+          id: contact._id,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to submit contact form",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// @route   GET /api/contact
+// @desc    Get all contacts (Admin)
+// @access  Private (Admin)
+router.get("/", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+
+    const query = status ? { status } : {};
+
+    const contacts = await Contact.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Contact.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      contacts,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch contacts",
+      error: error.message,
+    });
+  }
+});
+
+export default router;
