@@ -18,7 +18,14 @@ const donationSchema = new mongoose.Schema({
     panNumber: {
       type: String,
       uppercase: true,
-      match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN number format"],
+      validate: {
+        validator: function (v) {
+          // Only validate if PAN is provided
+          if (!v || v === "") return true;
+          return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+        },
+        message: "Invalid PAN number format",
+      },
     },
   },
   amount: {

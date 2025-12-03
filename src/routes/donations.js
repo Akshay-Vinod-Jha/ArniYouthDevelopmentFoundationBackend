@@ -2,6 +2,7 @@ import express from "express";
 import { body } from "express-validator";
 import Donation from "../models/Donation.js";
 import { createOrder, verifyPayment } from "../utils/razorpay.js";
+import { sendDonationReceipt } from "../utils/email.js";
 import { validate } from "../middleware/validator.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -34,13 +35,23 @@ router.post(
     try {
       const { donor, amount, program, message, isAnonymous } = req.body;
 
+      console.log("Received donation request:", { donor, amount, program });
+
       // Create Razorpay order
       const receiptId = `DON${Date.now()}`;
       const order = await createOrder(amount, receiptId);
 
+      console.log("Razorpay order created:", order);
+
+      // Clean donor data - remove empty PAN if present
+      const donorData = { ...donor };
+      if (!donorData.panNumber || donorData.panNumber.trim() === "") {
+        delete donorData.panNumber;
+      }
+
       // Create donation record
       const donation = await Donation.create({
-        donor,
+        donor: donorData,
         amount,
         program: program || "general",
         message,
@@ -50,6 +61,8 @@ router.post(
           status: "pending",
         },
       });
+
+      console.log("Donation record created:", donation._id);
 
       res.status(201).json({
         success: true,
@@ -65,6 +78,7 @@ router.post(
         },
       });
     } catch (error) {
+      console.error("Error creating donation:", error);
       res.status(500).json({
         success: false,
         message: "Failed to create donation",
@@ -80,6 +94,8 @@ router.post(
 router.post("/verify", async (req, res) => {
   try {
     const { donationId, orderId, paymentId, signature } = req.body;
+
+    console.log("🔍 Verifying payment:", { donationId, orderId, paymentId });
 
     const isValid = verifyPayment(orderId, paymentId, signature);
     if (!isValid) {
@@ -99,15 +115,59 @@ router.post("/verify", async (req, res) => {
       { new: true }
     );
 
+    console.log("💾 Donation updated:", donation._id);
+    console.log("📧 Anonymous donation?", donation.isAnonymous);
+
+    // Return donation data - frontend will handle email
     res.status(200).json({
       success: true,
       message: "Donation successful! Thank you for your contribution.",
       donation,
+      sendEmail: !donation.isAnonymous, // Flag for frontend to send email
     });
   } catch (error) {
+    console.error("❌ Error in verify route:", error);
     res.status(500).json({
       success: false,
       message: "Payment verification failed",
+      error: error.message,
+    });
+  }
+});
+
+// @route   POST /api/donations/test-email
+// @desc    Test email sending (for debugging)
+// @access  Public
+router.post("/test-email", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    console.log(
+      "🧪 Testing email send to:",
+      email || "akshayjha2006@gmail.com"
+    );
+
+    const result = await sendDonationReceipt({
+      donor: {
+        name: "Test User",
+        email: email || "akshayjha2006@gmail.com",
+      },
+      amount: 100,
+      paymentId: "test_payment_123",
+      donationId: "test_donation_123",
+      program: "general",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Test email sent",
+      result: result,
+    });
+  } catch (error) {
+    console.error("❌ Test email failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Test email failed",
       error: error.message,
     });
   }

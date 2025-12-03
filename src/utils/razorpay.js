@@ -1,14 +1,19 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
-// Initialize Razorpay only if keys are provided
-let razorpay = null;
-if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-  razorpay = new Razorpay({
+// Lazy initialization function
+const getRazorpayInstance = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error(
+      "Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file"
+    );
+  }
+
+  return new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
-}
+};
 
 /**
  * Create Razorpay order
@@ -17,11 +22,7 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
  * @returns {Promise<Object>} Order details
  */
 export const createOrder = async (amount, receipt) => {
-  if (!razorpay) {
-    throw new Error(
-      "Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file"
-    );
-  }
+  const razorpay = getRazorpayInstance();
 
   try {
     const options = {
@@ -41,7 +42,8 @@ export const createOrder = async (amount, receipt) => {
       currency: order.currency,
     };
   } catch (error) {
-    throw new Error("Failed to create Razorpay order");
+    console.error("Razorpay order creation error:", error);
+    throw new Error("Failed to create Razorpay order: " + error.message);
   }
 };
 
@@ -72,6 +74,8 @@ export const verifyPayment = (orderId, paymentId, signature) => {
  * @returns {Promise<Object>} Payment details
  */
 export const getPaymentDetails = async (paymentId) => {
+  const razorpay = getRazorpayInstance();
+
   try {
     const payment = await razorpay.payments.fetch(paymentId);
     return payment;
@@ -80,4 +84,4 @@ export const getPaymentDetails = async (paymentId) => {
   }
 };
 
-export default razorpay;
+export default { createOrder, verifyPayment, getPaymentDetails };
