@@ -34,6 +34,41 @@ router.get("/", async (req, res) => {
   }
 });
 
+// @route   GET /api/gallery/admin/all
+// @desc    Get all gallery items for admin (Image Library)
+// @access  Private (Admin)
+router.get("/admin/all", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { page = 1, limit = 50, type, category } = req.query;
+
+    const query = {};
+    if (type) query.type = type;
+    if (category) query.category = category;
+
+    const items = await Gallery.find(query)
+      .populate("uploadedBy", "name")
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Gallery.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      items,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch gallery items",
+      error: error.message,
+    });
+  }
+});
+
 // @route   POST /api/gallery
 // @desc    Upload gallery item (Admin)
 // @access  Private (Admin)

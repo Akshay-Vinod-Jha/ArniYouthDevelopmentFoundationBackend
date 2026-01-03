@@ -71,6 +71,43 @@ router.get("/:slug", async (req, res) => {
   }
 });
 
+// ============= ADMIN ROUTES =============
+
+// @route   GET /api/blog/admin/all
+// @desc    Get all blogs including unpublished (Admin)
+// @access  Private (Admin)
+router.get("/admin/all", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { category, page = 1, limit = 10, published } = req.query;
+
+    const query = {};
+    if (category) query.category = category;
+    if (published !== undefined) query.published = published === "true";
+
+    const blogs = await Blog.find(query)
+      .populate("author", "name")
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Blog.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      blogs,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch blogs",
+      error: error.message,
+    });
+  }
+});
+
 // @route   POST /api/blog
 // @desc    Create new blog (Admin)
 // @access  Private (Admin)

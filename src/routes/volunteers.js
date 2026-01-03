@@ -82,6 +82,111 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   GET /api/volunteers/:id
+// @desc    Get single volunteer by ID (Admin)
+// @access  Private (Admin)
+router.get("/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const volunteer = await Volunteer.findById(req.params.id);
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        message: "Volunteer application not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      volunteer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch volunteer",
+      error: error.message,
+    });
+  }
+});
+
+// @route   PUT /api/volunteers/:id/approve
+// @desc    Approve volunteer application (Admin)
+// @access  Private (Admin)
+router.put("/:id/approve", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { notes } = req.body;
+
+    const volunteer = await Volunteer.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "approved",
+        notes,
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        message: "Volunteer application not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Volunteer application approved successfully",
+      volunteer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve application",
+      error: error.message,
+    });
+  }
+});
+
+// @route   PUT /api/volunteers/:id/reject
+// @desc    Reject volunteer application (Admin)
+// @access  Private (Admin)
+router.put("/:id/reject", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { notes } = req.body;
+
+    const volunteer = await Volunteer.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "rejected",
+        notes,
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        message: "Volunteer application not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Volunteer application rejected",
+      volunteer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject application",
+      error: error.message,
+    });
+  }
+});
+
 // @route   PATCH /api/volunteers/:id/status
 // @desc    Update volunteer status (Admin)
 // @access  Private (Admin)

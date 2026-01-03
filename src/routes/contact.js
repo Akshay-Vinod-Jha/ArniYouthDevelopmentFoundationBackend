@@ -74,4 +74,100 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   GET /api/contact/:id
+// @desc    Get single contact by ID (Admin)
+// @access  Private (Admin)
+router.get("/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const contact = await Contact.findById(req.params.id);
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: "Contact message not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      contact,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch contact",
+      error: error.message,
+    });
+  }
+});
+
+// @route   PUT /api/contact/:id/status
+// @desc    Update contact status - mark as read/archived (Admin)
+// @access  Private (Admin)
+router.put("/:id/status", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { status, response } = req.body;
+
+    const updateData = {
+      status,
+      updatedBy: req.user.id,
+    };
+
+    if (status === "responded" && response) {
+      updateData.response = response;
+      updateData.respondedAt = new Date();
+    }
+
+    const contact = await Contact.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+    });
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: "Contact message not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Contact marked as ${status}`,
+      contact,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update contact status",
+      error: error.message,
+    });
+  }
+});
+
+// @route   DELETE /api/contact/:id
+// @desc    Delete contact message (Admin)
+// @access  Private (Admin)
+router.delete("/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const contact = await Contact.findByIdAndDelete(req.params.id);
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: "Contact message not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Contact message deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete contact",
+      error: error.message,
+    });
+  }
+});
+
 export default router;

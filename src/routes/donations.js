@@ -212,6 +212,125 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   GET /api/donations/admin/all
+// @desc    Get all donations with filters (Admin)
+// @access  Private (Admin)
+router.get("/admin/all", protect, authorize("admin"), async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      program,
+      dateFrom,
+      dateTo,
+      minAmount,
+      maxAmount,
+    } = req.query;
+
+    const query = {};
+    if (status) query["paymentDetails.status"] = status;
+    if (program) query.program = program;
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      query.amount = {};
+      if (minAmount) query.amount.$gte = parseInt(minAmount);
+      if (maxAmount) query.amount.$lte = parseInt(maxAmount);
+    }
+
+    const donations = await Donation.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Donation.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      donations,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch donations",
+      error: error.message,
+    });
+  }
+});
+
+// @route   GET /api/donations/export
+// @desc    Export donations as CSV (Admin)
+// @access  Private (Admin)
+router.get("/export", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { status, program, dateFrom, dateTo } = req.query;
+
+    const query = { "paymentDetails.status": "completed" };
+    if (program) query.program = program;
+
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    const donations = await Donation.find(query).sort({ createdAt: -1 });
+
+    // Generate CSV
+    const csvRows = [
+      [
+        "Date",
+        "Donor Name",
+        "Email",
+        "Phone",
+        "Amount",
+        "Program",
+        "Payment ID",
+        "Anonymous",
+      ],
+    ];
+
+    donations.forEach((donation) => {
+      csvRows.push([
+        new Date(donation.createdAt).toLocaleDateString(),
+        donation.isAnonymous ? "Anonymous" : donation.donor.name,
+        donation.isAnonymous ? "" : donation.donor.email,
+        donation.isAnonymous ? "" : donation.donor.phone,
+        donation.amount,
+        donation.program,
+        donation.paymentDetails.paymentId || "",
+        donation.isAnonymous ? "Yes" : "No",
+      ]);
+    });
+
+    const csv = csvRows.map((row) => row.join(",")).join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=donations-${Date.now()}.csv`
+    );
+    res.status(200).send(csv);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to export donations",
+      error: error.message,
+    });
+  }
+});
+
 // @route   GET /api/donations/stats
 // @desc    Get donation statistics
 // @access  Public

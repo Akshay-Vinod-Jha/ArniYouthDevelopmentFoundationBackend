@@ -214,4 +214,77 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   GET /api/members/:id
+// @desc    Get single member by ID (Admin only)
+// @access  Private (Admin)
+router.get("/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const member = await Member.findById(req.params.id).populate(
+      "user",
+      "name email phone"
+    );
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      member,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch member",
+      error: error.message,
+    });
+  }
+});
+
+// @route   PUT /api/members/:id/status
+// @desc    Update member status (Admin only)
+// @access  Private (Admin)
+router.put("/:id/status", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { isActive, notes } = req.body;
+
+    const member = await Member.findByIdAndUpdate(
+      req.params.id,
+      {
+        isActive,
+        notes,
+        updatedBy: req.user.id,
+      },
+      { new: true }
+    ).populate("user", "name email phone");
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
+    }
+
+    // Update user role if deactivating
+    if (!isActive) {
+      await User.findByIdAndUpdate(member.user._id, { role: "user" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Member ${isActive ? "activated" : "deactivated"} successfully`,
+      member,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update member status",
+      error: error.message,
+    });
+  }
+});
+
 export default router;
