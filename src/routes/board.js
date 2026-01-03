@@ -85,4 +85,124 @@ router.post(
   }
 );
 
+// @route   GET /api/board/admin/all
+// @desc    Get all board members for admin
+// @access  Private (Admin)
+router.get("/admin/all", protect, authorize("admin"), async (req, res) => {
+  try {
+    const { page = 1, limit = 50, boardType } = req.query;
+
+    const query = {};
+    if (boardType) query.boardType = boardType;
+
+    const boardMembers = await Board.find(query)
+      .sort({ order: 1, createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Board.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      boardMembers,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch board members",
+      error: error.message,
+    });
+  }
+});
+
+// @route   PUT /api/board/admin/:id
+// @desc    Update board member (Admin)
+// @access  Private (Admin)
+router.put(
+  "/admin/:id",
+  protect,
+  authorize("admin"),
+  uploadImage.single("image"),
+  async (req, res) => {
+    try {
+      const boardMember = await Board.findById(req.params.id);
+
+      if (!boardMember) {
+        return res.status(404).json({
+          success: false,
+          message: "Board member not found",
+        });
+      }
+
+      const updateData = req.body;
+
+      // Upload new image if provided
+      if (req.file) {
+        // Delete old image from Cloudinary
+        if (boardMember.image?.public_id) {
+          await deleteFromCloudinary(boardMember.image.public_id);
+        }
+
+        const imageResult = await uploadToCloudinary(
+          req.file.buffer,
+          "aydf/board"
+        );
+        updateData.image = imageResult;
+      }
+
+      Object.assign(boardMember, updateData);
+      await boardMember.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Board member updated successfully",
+        boardMember,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to update board member",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// @route   DELETE /api/board/admin/:id
+// @desc    Delete board member (Admin)
+// @access  Private (Admin)
+router.delete("/admin/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const boardMember = await Board.findById(req.params.id);
+
+    if (!boardMember) {
+      return res.status(404).json({
+        success: false,
+        message: "Board member not found",
+      });
+    }
+
+    // Delete image from Cloudinary
+    if (boardMember.image?.public_id) {
+      await deleteFromCloudinary(boardMember.image.public_id);
+    }
+
+    await boardMember.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Board member deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete board member",
+      error: error.message,
+    });
+  }
+});
+
 export default router;

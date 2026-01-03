@@ -187,6 +187,35 @@ router.put("/:id/reject", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   DELETE /api/volunteers/admin/:id
+// @desc    Delete volunteer application (Admin)
+// @access  Private (Admin)
+router.delete("/admin/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const volunteer = await Volunteer.findById(req.params.id);
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        message: "Volunteer application not found",
+      });
+    }
+
+    await volunteer.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Volunteer application deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete volunteer application",
+      error: error.message,
+    });
+  }
+});
+
 // @route   PATCH /api/volunteers/:id/status
 // @desc    Update volunteer status (Admin)
 // @access  Private (Admin)

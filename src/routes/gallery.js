@@ -2,7 +2,10 @@ import express from "express";
 import Gallery from "../models/Gallery.js";
 import { protect, authorize } from "../middleware/auth.js";
 import { uploadImage } from "../middleware/upload.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 
 const router = express.Router();
 
@@ -112,5 +115,39 @@ router.post(
     }
   }
 );
+
+// @route   DELETE /api/gallery/admin/:id
+// @desc    Delete gallery item (Admin)
+// @access  Private (Admin)
+router.delete("/admin/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const galleryItem = await Gallery.findById(req.params.id);
+
+    if (!galleryItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Gallery item not found",
+      });
+    }
+
+    // Delete from Cloudinary
+    if (galleryItem.media?.public_id) {
+      await deleteFromCloudinary(galleryItem.media.public_id);
+    }
+
+    await galleryItem.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Gallery item deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete gallery item",
+      error: error.message,
+    });
+  }
+});
 
 export default router;

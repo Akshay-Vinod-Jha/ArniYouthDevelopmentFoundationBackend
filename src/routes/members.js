@@ -287,4 +287,36 @@ router.put("/:id/status", protect, authorize("admin"), async (req, res) => {
   }
 });
 
+// @route   DELETE /api/members/admin/:id
+// @desc    Delete member (Admin only)
+// @access  Private (Admin)
+router.delete("/admin/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const member = await Member.findById(req.params.id);
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
+    }
+
+    // Update user role back to user
+    await User.findByIdAndUpdate(member.user, { role: "user" });
+
+    await member.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Member deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete member",
+      error: error.message,
+    });
+  }
+});
+
 export default router;
