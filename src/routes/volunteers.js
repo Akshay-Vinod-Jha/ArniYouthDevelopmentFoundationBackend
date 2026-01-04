@@ -3,6 +3,8 @@ import { body } from "express-validator";
 import Volunteer from "../models/Volunteer.js";
 import { protect, authorize } from "../middleware/auth.js";
 import { validate } from "../middleware/validator.js";
+import { upload } from "../middleware/upload.js";
+import { uploadDocumentToCloudinary } from "../utils/cloudinary.js";
 
 const router = express.Router();
 
@@ -11,14 +13,15 @@ const router = express.Router();
 // @access  Public
 router.post(
   "/apply",
+  upload.single("resume"),
   [
     body("name").trim().notEmpty().withMessage("Name is required"),
     body("email").isEmail().withMessage("Valid email is required"),
     body("phone")
       .matches(/^[0-9]{10}$/)
       .withMessage("Valid phone is required"),
-    body("age").isInt({ min: 16 }).withMessage("Age must be at least 16"),
-    body("reason")
+    body("dateOfBirth").optional().isISO8601(),
+    body("motivation")
       .trim()
       .notEmpty()
       .withMessage("Please tell us why you want to volunteer"),
@@ -26,9 +29,50 @@ router.post(
   validate,
   async (req, res) => {
     try {
-      const volunteerData = req.body;
+      console.log("Received volunteer application:", req.body);
+
+      let resumeUrl = null;
+
+      // Upload resume to Cloudinary if provided
+      if (req.file) {
+        console.log("Uploading resume to Cloudinary...");
+        const result = await uploadDocumentToCloudinary(
+          req.file.buffer,
+          "aydf/resumes"
+        );
+        resumeUrl = result.url;
+        console.log("Resume uploaded:", resumeUrl);
+      }
+
+      // Parse JSON fields
+      const availability = req.body.availability
+        ? JSON.parse(req.body.availability)
+        : {};
+      const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
+      const programs = req.body.programs ? JSON.parse(req.body.programs) : [];
+      const address = req.body.address ? JSON.parse(req.body.address) : {};
+
+      const volunteerData = {
+        name: req.body.name,
+        email: req.body.email,
+        phone: req.body.phone,
+        dateOfBirth: req.body.dateOfBirth,
+        address: {
+          city: address.city || "",
+          state: address.state || "",
+        },
+        occupation: req.body.occupation,
+        skills: skills,
+        interests: programs,
+        availability: availability.hoursPerWeek || "flexible",
+        availableDays: availability.days || [],
+        experience: req.body.experience,
+        reason: req.body.motivation,
+        resumeUrl: resumeUrl,
+      };
 
       const volunteer = await Volunteer.create(volunteerData);
+      console.log("Volunteer application saved:", volunteer._id);
 
       res.status(201).json({
         success: true,
@@ -41,6 +85,7 @@ router.post(
         },
       });
     } catch (error) {
+      console.error("Volunteer application error:", error);
       res.status(500).json({
         success: false,
         message: "Application submission failed",

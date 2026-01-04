@@ -8,6 +8,119 @@ import { createOrder, verifyPayment } from "../utils/razorpay.js";
 
 const router = express.Router();
 
+// @route   POST /api/members/apply
+// @desc    Apply for membership (creates user + initiates membership)
+// @access  Public
+router.post(
+  "/apply",
+  [
+    body("name").trim().notEmpty().withMessage("Name is required"),
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("phone")
+      .matches(/^[0-9]{10}$/)
+      .withMessage("Valid 10-digit phone number is required"),
+    body("address.city").optional().trim(),
+    body("address.state").optional().trim(),
+    body("address.pincode")
+      .optional()
+      .matches(/^[0-9]{6}$/),
+    body("occupation").optional().trim(),
+    body("dateOfBirth").optional().isISO8601(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { name, email, phone, address, occupation, dateOfBirth } = req.body;
+
+      console.log("Received membership application:", { name, email, phone });
+
+      // Check if user already exists
+      let user = await User.findOne({ email });
+
+      if (!user) {
+        console.log("Creating new user account...");
+        // Create new user account
+        user = await User.create({
+          name,
+          email,
+          phone,
+          password: `temp${Date.now()}`, // Temporary password
+          role: "user",
+        });
+        console.log("User created:", user._id);
+      } else {
+        console.log("Existing user found:", user._id);
+      }
+
+      // Check if already a member
+      const existingMember = await Member.findOne({ user: user._id });
+      if (existingMember && existingMember.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: "You are already an active member",
+        });
+      }
+
+      // Create Razorpay order
+      const membershipAmount = 500; // Amount in rupees (will be converted to paise by createOrder)
+      const receiptId = `MEM${Date.now()}`;
+      console.log("Creating Razorpay order for amount:", membershipAmount);
+      const order = await createOrder(membershipAmount, receiptId);
+      console.log("Razorpay order created:", order);
+
+      // Calculate expiry date (1 year from now)
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      // Prepare address object matching schema
+      const memberAddress = {
+        street: address?.line1 || "",
+        city: address?.city || "",
+        state: address?.state || "",
+        pincode: address?.pincode || "",
+      };
+
+      // Create member (payment pending)
+      console.log("Creating member record...");
+      const member = await Member.create({
+        user: user._id,
+        address: memberAddress,
+        occupation,
+        dateOfBirth,
+        membershipExpiryDate: expiryDate,
+        paymentDetails: {
+          orderId: order.orderId,
+          amount: 500,
+          status: "pending",
+        },
+      });
+      console.log("Member created:", member._id, member.membershipId);
+
+      res.status(201).json({
+        success: true,
+        message: "Membership application initiated",
+        member: {
+          id: member._id,
+          membershipId: member.membershipId,
+        },
+        order: {
+          orderId: order.orderId,
+          amount: order.amount,
+          currency: order.currency,
+          key: process.env.RAZORPAY_KEY_ID,
+        },
+      });
+    } catch (error) {
+      console.error("Membership application error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Membership application failed",
+        error: error.message,
+      });
+    }
+  }
+);
+
 // @route   POST /api/members/register
 // @desc    Register new member with payment
 // @access  Public
@@ -98,10 +211,19 @@ router.post(
 // @access  Public
 router.post("/verify-payment", async (req, res) => {
   try {
-    const { memberId, orderId, paymentId, signature } = req.body;
+    const {
+      memberId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
 
     // Verify payment signature
-    const isValid = verifyPayment(orderId, paymentId, signature);
+    const isValid = verifyPayment(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
     if (!isValid) {
       return res.status(400).json({
         success: false,
@@ -113,13 +235,20 @@ router.post("/verify-payment", async (req, res) => {
     const member = await Member.findByIdAndUpdate(
       memberId,
       {
-        "paymentDetails.paymentId": paymentId,
+        "paymentDetails.paymentId": razorpay_payment_id,
         "paymentDetails.status": "completed",
         "paymentDetails.paidAt": new Date(),
         isActive: true,
       },
       { new: true }
     ).populate("user", "name email phone");
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
+    }
 
     // Update user role to member
     await User.findByIdAndUpdate(member.user._id, { role: "member" });
@@ -135,6 +264,7 @@ router.post("/verify-payment", async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Payment verification error:", error);
     res.status(500).json({
       success: false,
       message: "Payment verification failed",

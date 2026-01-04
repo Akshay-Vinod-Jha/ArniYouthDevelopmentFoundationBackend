@@ -15,38 +15,28 @@ const volunteerSchema = new mongoose.Schema({
     type: String,
     required: [true, "Phone number is required"],
   },
-  age: {
-    type: Number,
-    required: [true, "Age is required"],
-    min: 16,
+  dateOfBirth: {
+    type: Date,
   },
   address: {
     city: String,
     state: String,
   },
   occupation: String,
-  education: String,
   skills: [String],
-  interests: {
-    type: [String],
-    enum: [
-      "healthcare",
-      "education",
-      "rural-development",
-      "social-justice",
-      "events",
-      "fundraising",
-    ],
-  },
+  interests: [String], // Programs of interest
   availability: {
     type: String,
-    enum: ["weekends", "weekdays", "flexible", "full-time"],
+    enum: ["5-10", "10-20", "20+", "flexible"],
+    default: "flexible",
   },
+  availableDays: [String], // Array of days
   experience: String,
   reason: {
     type: String,
     required: [true, "Please tell us why you want to volunteer"],
   },
+  resumeUrl: String, // Cloudinary URL
   status: {
     type: String,
     enum: ["pending", "approved", "rejected", "active", "inactive"],

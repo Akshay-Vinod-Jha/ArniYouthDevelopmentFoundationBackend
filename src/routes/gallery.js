@@ -82,6 +82,11 @@ router.post(
   uploadImage.single("media"),
   async (req, res) => {
     try {
+      console.log("=== Gallery Upload Request ===");
+      console.log("Request body:", req.body);
+      console.log("Request file:", req.file ? "File present" : "No file");
+      console.log("User ID:", req.user?.id);
+
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -89,17 +94,29 @@ router.post(
         });
       }
 
+      console.log("Uploading to Cloudinary...");
       const mediaResult = await uploadToCloudinary(
         req.file.buffer,
         "aydf/gallery"
       );
+      console.log("Cloudinary upload result:", mediaResult);
 
-      const galleryItem = await Gallery.create({
+      console.log("Creating gallery item in database...");
+
+      // Convert category to lowercase to match enum values
+      const galleryData = {
         ...req.body,
         type: "image",
         media: mediaResult,
         uploadedBy: req.user.id,
-      });
+      };
+
+      if (galleryData.category) {
+        galleryData.category = galleryData.category.toLowerCase();
+      }
+
+      const galleryItem = await Gallery.create(galleryData);
+      console.log("Gallery item created:", galleryItem._id);
 
       res.status(201).json({
         success: true,
@@ -107,6 +124,11 @@ router.post(
         item: galleryItem,
       });
     } catch (error) {
+      console.error("=== Gallery Upload Error ===");
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      console.error("Error details:", error);
+
       res.status(500).json({
         success: false,
         message: "Failed to upload gallery item",

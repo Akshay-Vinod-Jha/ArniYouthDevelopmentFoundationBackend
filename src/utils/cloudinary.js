@@ -39,6 +39,35 @@ export const uploadToCloudinary = (buffer, folder = "aydf") => {
 };
 
 /**
+ * Upload document (PDF, DOC, DOCX) to Cloudinary
+ * @param {Buffer} buffer - File buffer
+ * @param {String} folder - Cloudinary folder name
+ * @returns {Promise<Object>} Upload result
+ */
+export const uploadDocumentToCloudinary = (buffer, folder = "aydf") => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "raw", // Use 'raw' for documents to avoid image transformations
+        format: "pdf", // Explicitly set format
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
+        }
+      }
+    );
+    uploadStream.end(buffer);
+  });
+};
+
+/**
  * Delete file from Cloudinary
  * @param {String} publicId - Cloudinary public ID
  * @returns {Promise<Object>} Delete result
