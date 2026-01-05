@@ -73,6 +73,7 @@ import blogRoutes from "./routes/blog.js";
 import galleryRoutes from "./routes/gallery.js";
 import contactRoutes from "./routes/contact.js";
 import boardRoutes from "./routes/board.js";
+import villageProfileRoutes from "./routes/villageProfiles.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
@@ -83,6 +84,7 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/board", boardRoutes);
+app.use("/api/village-profiles", villageProfileRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
