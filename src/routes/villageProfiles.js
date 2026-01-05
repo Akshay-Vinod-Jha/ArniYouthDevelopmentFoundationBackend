@@ -207,10 +207,11 @@ router.post(
 
       // Upload photo to Cloudinary if provided
       if (req.file) {
-        photoUrl = await uploadToCloudinary(
+        const uploadResult = await uploadToCloudinary(
           req.file.buffer,
           "village-profiles"
         );
+        photoUrl = uploadResult.url;
       }
 
       const profile = await VillageProfile.create({
@@ -283,11 +284,11 @@ router.put(
 
       // Upload new photo if provided
       if (req.file) {
-        const photoUrl = await uploadToCloudinary(
+        const uploadResult = await uploadToCloudinary(
           req.file.buffer,
           "village-profiles"
         );
-        profile.photo = photoUrl;
+        profile.photo = uploadResult.url;
       }
 
       await profile.save();
