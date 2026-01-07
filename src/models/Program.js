@@ -96,4 +96,19 @@ const programSchema = new mongoose.Schema(
   }
 );
 
+// Auto-generate ID if not provided
+programSchema.pre("save", function (next) {
+  if (!this.id && this.isNew) {
+    // Generate ID from title: lowercase, replace spaces with hyphens
+    this.id = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    // Add timestamp suffix to ensure uniqueness
+    this.id += `-${Date.now()}`;
+  }
+  next();
+});
+
 export default mongoose.model("Program", programSchema);
