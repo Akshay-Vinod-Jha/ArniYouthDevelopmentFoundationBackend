@@ -18,6 +18,51 @@ const programSchema = new mongoose.Schema(
       required: [true, "Program description is required"],
       trim: true,
     },
+    image: {
+      url: {
+        type: String,
+        default: "",
+      },
+      publicId: {
+        type: String,
+        default: "",
+      },
+    },
+    category: {
+      type: String,
+      enum: [
+        "healthcare",
+        "education",
+        "rural-development",
+        "social-justice",
+        "environment",
+        "other",
+      ],
+      default: "other",
+    },
+    objectives: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    targetAudience: {
+      type: String,
+      trim: true,
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    duration: {
+      type: String,
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: ["active", "completed", "upcoming", "on-hold"],
+      default: "active",
+    },
     initiatives: [
       {
         name: {

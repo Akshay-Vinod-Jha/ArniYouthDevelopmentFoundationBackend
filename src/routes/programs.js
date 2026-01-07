@@ -1,6 +1,11 @@
 import express from "express";
 import Program from "../models/Program.js";
 import { protect, authorize } from "../middleware/auth.js";
+import { uploadImage } from "../middleware/upload.js";
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 
 const router = express.Router();
 
@@ -80,58 +85,121 @@ router.get("/admin/all", protect, authorize("admin"), async (req, res) => {
 // @route   POST /api/programs
 // @desc    Create new program - Admin only
 // @access  Private/Admin
-router.post("/", protect, authorize("admin"), async (req, res) => {
-  try {
-    const program = await Program.create(req.body);
+router.post(
+  "/",
+  protect,
+  authorize("admin"),
+  uploadImage.single("image"),
+  async (req, res) => {
+    try {
+      const programData = { ...req.body };
 
-    res.status(201).json({
-      success: true,
-      message: "Program created successfully",
-      program,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to create program",
-      error: error.message,
-    });
+      // Handle objectives if sent as string
+      if (typeof programData.objectives === "string") {
+        programData.objectives = programData.objectives
+          .split(",")
+          .map((obj) => obj.trim())
+          .filter((obj) => obj);
+      }
+
+      // Upload image to Cloudinary if provided
+      if (req.file) {
+        const imageResult = await uploadToCloudinary(
+          req.file.buffer,
+          "aydf/programs"
+        );
+        programData.image = {
+          url: imageResult.url,
+          publicId: imageResult.publicId,
+        };
+      }
+
+      const program = await Program.create(programData);
+
+      res.status(201).json({
+        success: true,
+        message: "Program created successfully",
+        program,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to create program",
+        error: error.message,
+      });
+    }
   }
-});
+);
 
 // @route   PUT /api/programs/:id
 // @desc    Update program - Admin only
 // @access  Private/Admin
-router.put("/:id", protect, authorize("admin"), async (req, res) => {
-  try {
-    const program = await Program.findOneAndUpdate(
-      { id: req.params.id },
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+router.put(
+  "/:id",
+  protect,
+  authorize("admin"),
+  uploadImage.single("image"),
+  async (req, res) => {
+    try {
+      const programData = { ...req.body };
 
-    if (!program) {
-      return res.status(404).json({
+      // Handle objectives if sent as string
+      if (typeof programData.objectives === "string") {
+        programData.objectives = programData.objectives
+          .split(",")
+          .map((obj) => obj.trim())
+          .filter((obj) => obj);
+      }
+
+      // Find existing program
+      const existingProgram = await Program.findOne({ id: req.params.id });
+      if (!existingProgram) {
+        return res.status(404).json({
+          success: false,
+          message: "Program not found",
+        });
+      }
+
+      // Upload new image if provided
+      if (req.file) {
+        // Delete old image from Cloudinary if exists
+        if (existingProgram.image?.publicId) {
+          await deleteFromCloudinary(existingProgram.image.publicId);
+        }
+
+        const imageResult = await uploadToCloudinary(
+          req.file.buffer,
+          "aydf/programs"
+        );
+        programData.image = {
+          url: imageResult.url,
+          publicId: imageResult.publicId,
+        };
+      }
+
+      const program = await Program.findOneAndUpdate(
+        { id: req.params.id },
+        programData,
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Program updated successfully",
+        program,
+      });
+    } catch (error) {
+      res.status(500).json({
         success: false,
-        message: "Program not found",
+        message: "Failed to update program",
+        error: error.message,
       });
     }
-
-    res.status(200).json({
-      success: true,
-      message: "Program updated successfully",
-      program,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to update program",
-      error: error.message,
-    });
   }
-});
+);
 
 // @route   DELETE /api/programs/:id
 // @desc    Delete program - Admin only
@@ -145,6 +213,11 @@ router.delete("/:id", protect, authorize("admin"), async (req, res) => {
         success: false,
         message: "Program not found",
       });
+    }
+
+    // Delete image from Cloudinary if exists
+    if (program.image?.publicId) {
+      await deleteFromCloudinary(program.image.publicId);
     }
 
     res.status(200).json({
