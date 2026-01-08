@@ -151,6 +151,14 @@ router.post(
         author: req.user.id,
       };
 
+      // Handle tags array from FormData
+      if (req.body["tags[]"]) {
+        blogData.tags = Array.isArray(req.body["tags[]"])
+          ? req.body["tags[]"]
+          : [req.body["tags[]"]];
+        delete blogData["tags[]"];
+      }
+
       // Convert category to lowercase to match enum values
       if (blogData.category) {
         blogData.category = blogData.category.toLowerCase();
@@ -220,6 +228,14 @@ router.put(
       }
 
       const updateData = { ...req.body };
+
+      // Handle tags array from FormData
+      if (req.body["tags[]"]) {
+        updateData.tags = Array.isArray(req.body["tags[]"])
+          ? req.body["tags[]"]
+          : [req.body["tags[]"]];
+        delete updateData["tags[]"];
+      }
 
       // Convert category to lowercase to match enum values
       if (updateData.category) {
