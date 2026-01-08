@@ -33,7 +33,10 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "https://arni-youth-development-foundation-f.vercel.app",
+  "https://www.aydf.in",
+  "https://aydf.in",
   process.env.FRONTEND_URL,
+  process.env.CUSTOM_DOMAIN_URL,
 ].filter(Boolean); // Remove undefined values
 
 app.use(
