@@ -44,7 +44,6 @@ const villageProfileSchema = new mongoose.Schema(
     bio: {
       type: String,
       trim: true,
-      maxlength: [500, "Bio cannot exceed 500 characters"],
     },
     isActive: {
       type: Boolean,
@@ -53,7 +52,7 @@ const villageProfileSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for search and filter

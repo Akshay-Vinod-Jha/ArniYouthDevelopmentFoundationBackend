@@ -17,7 +17,6 @@ const blogSchema = new mongoose.Schema({
   },
   excerpt: {
     type: String,
-    maxlength: 200,
   },
   featuredImage: {
     url: String,
